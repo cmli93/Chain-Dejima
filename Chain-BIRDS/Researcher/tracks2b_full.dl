@@ -1,0 +1,34 @@
+% describe the schema of sources and views
+%s:tracks1(TRACK:string,DATE:int,RATING:int,ALBUM:string,QUANTITY:int).
+%v:tracks2(TRACK:string,RATING:int,ALBUM:string,QUANTITY:int).
+
+% constraints:
+% ⊥ :- tracks1(T,_,R1,_,_), tracks1(T,_,R2,_,_), NOT R1 = R2. %TRACK -> RATING
+% ⊥ :- tracks1(T,D1,_,_,_), tracks1(T,D2,_,_,_), NOT D1 = D2. %TRACK -> DATE
+% ⊥ :- tracks1(_,_,_,A,Q1), tracks1(_,_,_,A,Q2), NOT Q1 = Q2. %ALBUMN -> QUANTITY
+% ⊥ :- tracks2(T,R1,_,_), tracks2(T,R2,_,_), NOT R1 = R2. %TRACK -> RATING
+% ⊥ :- tracks2(_,_,A,Q1), tracks2(_,_,A,Q2), NOT Q1 = Q2. %ALBUMN -> QUANTITY
+
+% view definition:
+tracks2(T,R,A,Q) :- tracks1(T,_,R,A,Q).
+
+% rule for deletion from tracks1
+-tracks1(TRACK,DATE,RATING,ALBUM,QUANTITY) :- tracks1(TRACK,DATE,RATING,ALBUM,QUANTITY),
+    not tracks2(TRACK,RATING,ALBUM,QUANTITY).
+
+%rule for insertion to tracks1
+
+% after deleting one tuple, we need to insert new one, however,
+%the view tracks2 does not have the column DATE, we need to found a value for this column.
+%One idea is finding it from the old tuples in the source tracks1,
+%we can find it if tracks1 has a primary key,
+%suppose that the key is (TRACK,ALBUM), then we can write a rule as follows:
+
++tracks1(TRACK,DATE,RATING,ALBUM,QUANTITY) :- tracks2(TRACK,RATING,ALBUM,QUANTITY),
+    not tracks1(TRACK,_,RATING,ALBUM,QUANTITY), tracks1(TRACK,DATE,_,ALBUM,_).
+
+% But we need consider the case when we do not find the column DATE in the source tracks1.
+%In this case we can fill the column DATE with a defaul value such as NULL as follows:
+
++tracks1(TRACK,2018,RATING,ALBUM,QUANTITY) :- tracks2(TRACK,RATING,ALBUM,QUANTITY),
+    not tracks1(TRACK,_,_,ALBUM,_).

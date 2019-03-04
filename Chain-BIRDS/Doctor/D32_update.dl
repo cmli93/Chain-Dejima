@@ -1,0 +1,33 @@
+% describe the schema of sources and views
+%s:d3_doctor(PATIENTID:int,MEDICATIONNAME:string,CLINICALDATA:string,
+              MECHANISMOFACTION:string,DOSAGE:string).
+%v:d32_doctandresear(MEDICATIONNAME:string,MECHANISMOFACTION:string).
+
+% constraints:
+% ⊥ :- d3_doctor(P,M1,_,_,_), d3_doctor(P,M2,_,_,_), NOT M1 = M2. %PATIENTID -> MEDICATIONNAME
+% ⊥ :- d32_doctandresear(M,MF1), d32_doctandresear(M,MF2), NOT MF1 = MF2. %MEDICATIONNAME -> MECHANISMOFACTION
+% 上面的限制可能需要修正考虑，细化考虑加上更多的限制
+
+% view definition:
+d32_doctandresear(MEDICATIONNAME,MECHANISMOFACTION)
+  :-
+  d3_doctor(_,MEDICATIONNAME,_,MECHANISMOFACTION,_).
+%  not MEDICATIONNAME = 'to be updated'.
+
+% 这样的view定义产生的view中记录的顺序和source中对应记录的顺序不一致，暂时跳过这个limit now
+
+%rule for deletion from d3_doctor
+-d3_doctor(PATIENTID,MEDICATIONNAME,CLINICALDATA,MECHANISMOFACTION,DOSAGE)
+  :-
+  d3_doctor(PATIENTID,MEDICATIONNAME,CLINICALDATA,MECHANISMOFACTION,DOSAGE),
+  not d32_doctandresear(MEDICATIONNAME,MECHANISMOFACTION).
+
+%rule for insertion into d3_doctor
++d3_doctor(PATIENTID,MEDICATIONNAME,CLINICALDATA,MECHANISMOFACTION,DOSAGE)
+  :-
+  d32_doctandresear(MEDICATIONNAME,MECHANISMOFACTION),
+  not d3_doctor(_,MEDICATIONNAME,_,MECHANISMOFACTION,_),
+  d3_doctor(PATIENTID,MEDICATIONNAME,CLINICALDATA,_,DOSAGE).
+
+% SQL updates for testing this strategy (researcher can only update MECHANISMOFACTION):
+% UPDATE d32_doctandresear set mechanismofaction = 'lanlan' WHERE medicationname = 'Ibuprofen';

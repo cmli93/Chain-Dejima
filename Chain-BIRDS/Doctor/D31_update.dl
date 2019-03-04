@@ -1,0 +1,42 @@
+%describe the schema of sources and views
+%s:d3_doctor(PATIENTID:int,MEDICATIONNAME:string,CLINICALDATA:string,
+              MECHANISMOFACTION:string,DOSAGE:string).
+%v:d31_doctandpati(PATIENTID:int,MEDICATIONNAME:string,CLINICALDATA:string,DOSAGE:string).
+
+% constraints:
+% ⊥ :- d3_doctor(P,M1,_,_,_), d3_doctor(P,M2,_,_,_), NOT M1 = M2. %PATIENTID -> MEDICATIONNAME
+% 上面的限制可能需要修正考虑，细化考虑加上更多的限制
+
+% view definition:
+d31_doctandpati(PATIENTID,MEDICATIONNAME,CLINICALDATA,DOSAGE)
+  :-
+  d3_doctor(PATIENTID,MEDICATIONNAME,CLINICALDATA,_,DOSAGE),
+  PATIENTID = 188.
+  % 医生与每位病人之间维护一个shared (view records).考虑一个病人只能看到自己patient id的数据
+
+% 病人只能修改CLINICALDATA, DOSAGE, 医生需要把这一修改put回自己的source table
+% 此处仅考虑给病人使用一种药,
+% 共享整条记录的新增只能由医生完成
+
+% 不允许医生删除一条病人记录，但若想删除的话，可以考虑给病人的source上加一个tag表示是否与医生共享记录，
+% 类似研究者那端，这样在医生删除此病人记录的时候，不会造成病人自己一端的source的此条共享数据的丢失
+
+%rule for deletion from d3_doctor
+-d3_doctor(PATIENTID,MEDICATIONNAME,CLINICALDATA,MECHANISMOFACTION,DOSAGE)
+  :-
+  d3_doctor(PATIENTID,MEDICATIONNAME,CLINICALDATA,MECHANISMOFACTION,DOSAGE),
+  not d31_doctandpati(PATIENTID,_,CLINICALDATA,DOSAGE),
+  PATIENTID = 188.
+
+%rule for insertion to d3_doctor
++d3_doctor(PATIENTID,MEDICATIONNAME,CLINICALDATA,MECHANISMOFACTION,DOSAGE)
+    :-
+    d31_doctandpati(PATIENTID,MEDICATIONNAME,CLINICALDATA,DOSAGE),
+    not d3_doctor(PATIENTID,_,CLINICALDATA,_,DOSAGE),
+    d3_doctor(PATIENTID,MEDICATIONNAME,_,MECHANISMOFACTION,_),
+    PATIENTID = 188.
+
+% 暂时不考虑病人直接删除自己的整条记录
+
+% SQL updates for testing this strategy
+% UPDATE d31_doctandpati set clinicalData = 'test' WHERE patientid = 188;

@@ -1,0 +1,52 @@
+% describe the schema of sources and views
+%s:d2_researcher(MEDICATIONNAME:string,MECHANISMOFACTION:string,MODEOFACTION:string,SHAREDWITHDOCTORORNOT:string).
+%v:d23_researanddoc(MEDICATIONNAME:string,MECHANISMOFACTION:string).
+
+% constraints:
+% ⊥ :- d2_researcher(M,Mec1,_,_), d2_researcher(M,Mec2,_,_), Mec1 = Mec2. %MEDICATIONNAME -> MECHANISMOFACTION
+% ⊥ :- d23_researanddoc(M,Mec1), d23_researanddoc(M,Mec2), Mec1 = Mec2. %MEDICATIONNAME -> MECHANISMOFACTION
+% 上面的限制可能需要修正考虑，细化考虑加上更多的限制
+
+% view definition:
+d23_researanddoc(MEDICATIONNAME,MECHANISMOFACTION)
+  :-
+  d2_researcher(MEDICATIONNAME,MECHANISMOFACTION,_,SHAREDWITHDOCTORORNOT),
+  SHAREDWITHDOCTORORNOT = 'Yes'.
+
+% 这样的view定义产生的view中记录的顺序和source中对应记录的顺序不一致，暂时跳过这个limit now
+
+% 医生能: -> 研究者应该做什么来把相应的操作put回自己的source table:
+%    修改MECHANISMOFACTION -> 修改D2中对应的MECHANISMOFACTION
+%    删除d23的一整条记录Rei -> 修改D2中对应的记录Rei的sharedWithDoctorOrNot值为'No'
+%    向d23增加一整条记录 -> 向D2中增加一条对应的记录，
+%                        modeOfAction置为'to be added',
+%                        sharedWithDoctorOrNot置为'Yes'
+
+-d2_researcher(MEDICATIONNAME,MECHANISMOFACTION,MODEOFACTION,SHAREDWITHDOCTORORNOT)
+    :-
+    d2_researcher(MEDICATIONNAME,MECHANISMOFACTION,MODEOFACTION,SHAREDWITHDOCTORORNOT),
+    SHAREDWITHDOCTORORNOT = 'Yes',
+    not d23_researanddoc(MEDICATIONNAME,MECHANISMOFACTION).
+
++d2_researcher(MEDICATIONNAME,MECHANISMOFACTION2,MODEOFACTION,SHAREDWITHDOCTORORNOT)
+    :-
+    d2_researcher(MEDICATIONNAME,MECHANISMOFACTION1,MODEOFACTION,SHAREDWITHDOCTORORNOT),
+    SHAREDWITHDOCTORORNOT = 'Yes',
+    d23_researanddoc(MEDICATIONNAME,MECHANISMOFACTION2),
+    not MECHANISMOFACTION1 = MECHANISMOFACTION2.
+
++d2_researcher(MEDICATIONNAME,MECHANISMOFACTION,MODEOFACTION,'No')
+    :-
+    d2_researcher(MEDICATIONNAME,MECHANISMOFACTION,MODEOFACTION,SHAREDWITHDOCTORORNOT),
+    SHAREDWITHDOCTORORNOT = 'Yes',
+    not d23_researanddoc(MEDICATIONNAME,_).
+
++d2_researcher(MEDICATIONNAME,MECHANISMOFACTION,'to be added', 'Yes')
+    :-
+    d23_researanddoc(MEDICATIONNAME,MECHANISMOFACTION),
+    not d2_researcher(MEDICATIONNAME,_,_,_).
+
+% SQL updates for testing this strategy
+% UPDATE d23_researanddoc set mechanismofaction = 'test' WHERE medicationname = 'Ibuprofen';
+% DELETE FROM d23_researanddoc WHERE medicationname = 'Ibuprofen';
+% INSERT INTO d23_researanddoc VALUES ('try', 'try');

@@ -1,0 +1,38 @@
+% describe the schema of sources and views
+%s:d1_patient(PATIENTID:int,MEDICATIONNAME:string,CLINICALDATA:string,
+                ADDRESS:string,DOSAGE:string).
+%v:d13_patianddoct(PATIENTID:int,MEDICATIONNAME:string,
+                    CLINICALDATA:string,DOSAGE:string).
+
+% constraints:
+% ⊥ :- d1_patient(P,M1,_,_,_), d1_patient(P,M2,_,_,_), M1 = M2. %PATIENTID -> MEDICATIONNAME
+% ⊥ :- d13_patianddoct(P,M1,_,_), d13_patianddoct(P,M2,_,_), M1 = M2. %PATIENTID -> MEDICATIONNAME
+% 上面的限制可能需要修正考虑，细化考虑加上更多的限制
+
+% view definition:
+d13_patianddoct(PATIENTID,MEDICATIONNAME,CLINICALDATA,DOSAGE)
+  :-
+  d1_patient(PATIENTID,MEDICATIONNAME,CLINICALDATA,_,DOSAGE).
+
+% 这样的view定义产生的view中记录的顺序和source中对应记录的顺序不一致，暂时跳过这个limit now
+
+% 医生能修改MEDICATIONNAME，CLINICALDATA, DOSAGE, 病人需要把这一修改put回自己的source table
+% 此处仅考虑给病人使用一种药
+
+%rule for deletion from d1_patient
+-d1_patient(PATIENTID,MEDICATIONNAME,CLINICALDATA,ADDRESS,DOSAGE)
+  :-
+  d1_patient(PATIENTID,MEDICATIONNAME,CLINICALDATA,ADDRESS,DOSAGE),
+  not d13_patianddoct(PATIENTID,MEDICATIONNAME,CLINICALDATA,DOSAGE).
+
+%rule for update to d1_patient
++d1_patient(PATIENTID,MEDICATIONNAME,CLINICALDATA,ADDRESS,DOSAGE)
+  :-
+  d13_patianddoct(PATIENTID,MEDICATIONNAME,CLINICALDATA,DOSAGE),
+  not d1_patient(PATIENTID,MEDICATIONNAME,CLINICALDATA,_,DOSAGE),
+  d1_patient(PATIENTID,_,_,ADDRESS,_).
+
+% 暂时不考虑医生直接删除病人的整条记录
+
+% SQL updates for testing this strategy
+% UPDATE d13_patianddoct set medicationName = 'chunchun' WHERE patientid = 188;
